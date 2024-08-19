@@ -3,9 +3,7 @@
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import imutils
-import easyocr
-import os,json
+import imutils,easyocr,os,json,results
 
 def read_json(config_path):
     with open(config_path,"r") as file:
@@ -16,10 +14,6 @@ def construct_gray_scale_image(config):
     car_image = cv2.imread(config["car_image_path"])
     gray_scale_image = cv2.cvtColor(car_image,cv2.COLOR_BGR2GRAY)
     return car_image,gray_scale_image
-
-def display_gray_scale_img(gray_scale_image):
-    plt.imshow(gray_scale_image)
-    plt.show() 
 
 #bilateralFilter parameters d(Diameter),SigmaColor(Blending two similar colors),SigmaSpace(Smoothen images)
 def apply_filter(gray_scale_image): 
@@ -51,13 +45,18 @@ def apply_mask(car_image,gray_scale_image,number_plate_location):
     license_plate = cv2.bitwise_and(car_image,car_image,mask=mask) #img comparison pixel by pixel, only white areas to be shown
     return license_plate,mask
 
-def display_number_plate(license_plate,mask):
+def extract_text(cropped_image):
+    reader = easyocr.Reader(['en'],gpu=True)
+    texts = reader.readtext(cropped_image)
+    extracted_texts = [text[-2] for text in texts]
+    return extracted_texts
+
+def extract_number_plate(license_plate,mask):
     x,y = np.where(mask==255) #row indices and column indices where pixel values are 255
     x1,y1 = np.min(x),np.min(y)
     x2,y2 = np.max(x),np.max(y)
     cropped_image = license_plate[x1:x2+1,y1:y2+1]
-    plt.imshow(cropped_image)
-    plt.show()
+    return cropped_image
 
 def destroy_windows():
     cv2.waitKey(0)
@@ -70,8 +69,9 @@ def main():
     image_contours = identify_contours(filtered_image)
     number_plate_location = identify_number_plate(image_contours)
     license_plate,mask = apply_mask(car_image,gray_scale_image,number_plate_location)
-    display_gray_scale_img(filtered_image)
-    display_number_plate(license_plate,mask)
-    destroy_windows()
-
+    number_plate_cropped = extract_number_plate(license_plate,mask)
+    text = extract_text(car_image)
+    results.display_number_plate(number_plate_cropped)
+    results.display_result(text)
+    results.display_img(car_image)
 main()
